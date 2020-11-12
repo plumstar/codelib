@@ -1,0 +1,58 @@
+@echo off
+
+:: 批量下载ftp里/logs所有子目录里world0_20201112*前缀的日志文件
+:: 下面几行配置自行修改
+set FTP_IP=127.0.0.1
+set USERNAME=username
+set PASSWORD=password
+set DIR_NAME=/logs
+set FILE_PREFIX=world0_20201112
+
+rmdir /s /q %FILE_PREFIX%
+mkdir %FILE_PREFIX%
+
+echo "获取目录列表..."
+set FTP_CMD_FILE1=%FILE_PREFIX%/ftp.cmd1.txt
+set DIR_LIST_FILE=%FILE_PREFIX%/dir.list.txt
+echo open %FTP_IP%> %FTP_CMD_FILE1%
+echo %USERNAME%>> %FTP_CMD_FILE1%
+echo %PASSWORD%>> %FTP_CMD_FILE1%
+echo bin>> %FTP_CMD_FILE1%
+echo mdir %DIR_NAME% %DIR_LIST_FILE%>> %FTP_CMD_FILE1%
+echo close>> %FTP_CMD_FILE1%
+echo bye>> %FTP_CMD_FILE1%
+ftp -i -s:%FTP_CMD_FILE1%
+
+echo "创建本地目录和生成日志文件列表..."
+set FILE_LIST_FILE=%FILE_PREFIX%/file.list.txt
+rem 设置变量延迟扩展
+SETLOCAL EnableDelayedExpansion
+for /f "eol=; tokens=1,9 delims=\n " %%i in (%DIR_LIST_FILE%) do (
+	set var=%%j
+	mkdir %FILE_PREFIX%\!var:~0,-1!
+	echo !var:~0,-1!>> %FILE_LIST_FILE%
+)
+
+echo "下载日志文件..."
+set FTP_CMD_FILE2=%FILE_PREFIX%/ftp.cmd2.txt
+echo open %FTP_IP%> %FTP_CMD_FILE2%
+echo %USERNAME%>> %FTP_CMD_FILE2%
+echo %PASSWORD%>> %FTP_CMD_FILE2%
+echo bin>> %FTP_CMD_FILE2%
+echo hash>> %FTP_CMD_FILE2%
+rem echo prompt>> %FTP_CMD_FILE2%
+mkdir %FILE_PREFIX%\tmp
+echo lcd %FILE_PREFIX%\tmp>> %FTP_CMD_FILE2%
+for /f %%i in (%FILE_LIST_FILE%) do (
+	rem set /p=mget %%i/%FILE_PREFIX%<nul>> %FTP_CMD_FILE2%
+	rem set var=%%i
+	rem echo mget !var:~0,-1!/%FILE_PREFIX%>> %FTP_CMD_FILE2%
+	echo lcd ..\%%i>> %FTP_CMD_FILE2%
+	echo mget %DIR_NAME%/%%i/%FILE_PREFIX%*>> %FTP_CMD_FILE2%
+)
+echo close>> %FTP_CMD_FILE2%
+echo bye>> %FTP_CMD_FILE2%
+ftp -i -s:%FTP_CMD_FILE2%
+
+echo "DONE."
+pause
